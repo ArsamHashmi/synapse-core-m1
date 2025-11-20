@@ -12,8 +12,13 @@ from openai import OpenAI
 
 # ========= OpenAI + Embedding config =========
 
-MEMORY_FILE = Path("memory.json")
-FAISS_FILE = Path("memory.index")
+# Legacy default files (for the "default" user)
+MEMORY_DIR = Path("memory")
+MEMORY_DIR.mkdir(exist_ok=True)
+
+MEMORY_FILE = MEMORY_DIR / "memory.json"
+FAISS_FILE  = MEMORY_DIR / "memory.index"
+
 EMBED_DIM = 1536
 EMBED_MODEL = "text-embedding-3-small"
 
@@ -63,24 +68,55 @@ class MemoryItem:
     created_at: int | None = None
 
 
-# FAISS index + in-memory memory items
-faiss_index: faiss.IndexFlatL2 = faiss.IndexFlatL2(EMBED_DIM)
-memory_items: List[MemoryItem] = []
+# ========= Per-user stores (in-memory) =========
+
+# username -> List[MemoryItem]
+_user_memory_items: Dict[str, List[MemoryItem]] = {}
+
+# username -> faiss.IndexFlatL2
+_user_faiss_index: Dict[str, faiss.IndexFlatL2] = {}
 
 
-# ========= Core I/O & Embeddings =========
+# --------- Helpers: username -> safe id + paths ----------
 
-def init_memory():
+def _sanitize_username(username: Optional[str]) -> str:
     """
-    Load FAISS index + memory.json if present, otherwise start fresh.
-    Call this once at app startup.
+    Normalize username into a safe identifier for filenames.
     """
-    global faiss_index, memory_items
+    if not username:
+        return "default"
+    uname = username.strip().lower()
+    cleaned = "".join(ch for ch in uname if ch.isalnum() or ch in ("_", "-"))
+    return cleaned or "default"
 
-    if MEMORY_FILE.exists() and FAISS_FILE.exists():
-        print("🔄 Loading existing memory...")
 
-        with MEMORY_FILE.open("r", encoding="utf8") as f:
+def _paths_for_user(uname: str) -> Tuple[Path, Path]:
+    """
+    For a given normalized username, return (json_path, faiss_index_path).
+    Default user uses the legacy MEMORY_FILE / FAISS_FILE names.
+    """
+    if uname == "default":
+        return MEMORY_FILE, FAISS_FILE
+    return Path(f"memory/memory_{uname}.json"), Path(f"memory/memory_{uname}.index")
+
+
+def _load_user_store(uname: str) -> None:
+    """
+    Ensure _user_memory_items[uname] and _user_faiss_index[uname] are loaded.
+    Uses the same logic as your original init_memory, just scoped per-user.
+    """
+    global _user_memory_items, _user_faiss_index
+
+    if uname in _user_faiss_index:
+        # already loaded
+        return
+
+    json_path, index_path = _paths_for_user(uname)
+
+    if json_path.exists() and index_path.exists():
+        print(f"🔄 Loading existing memory for user={uname!r}...")
+
+        with json_path.open("r", encoding="utf8") as f:
             raw = json.load(f)
 
         loaded_items: List[MemoryItem] = []
@@ -111,22 +147,47 @@ def init_memory():
                         )
                     )
 
-        memory_items = [m for m in loaded_items if m.text]
+        items = [m for m in loaded_items if m.text]
 
-        faiss_index = faiss.read_index(str(FAISS_FILE))
+        index = faiss.read_index(str(index_path))
 
-        if faiss_index.ntotal != len(memory_items):
+        if index.ntotal != len(items):
             print(
-                f"⚠️ Index/text size mismatch (index={faiss_index.ntotal}, "
-                f"items={len(memory_items)}). Using the smaller count."
+                f"⚠️ Index/text size mismatch for user={uname!r} "
+                f"(index={index.ntotal}, items={len(items)}). Using the smaller count."
             )
-            n = min(faiss_index.ntotal, len(memory_items))
-            memory_items = memory_items[:n]
-        print(f"✅ Loaded {len(memory_items)} memory items.")
+            n = min(index.ntotal, len(items))
+            items = items[:n]
+
+        _user_memory_items[uname] = items
+        _user_faiss_index[uname] = index
+        print(f"✅ Loaded {len(items)} memory items for user={uname}.")
     else:
-        print("🆕 Starting fresh memory.")
-        faiss_index = faiss.IndexFlatL2(EMBED_DIM)
-        memory_items = []
+        print(f"🆕 Starting fresh memory for user={uname}.")
+        _user_memory_items[uname] = []
+        _user_faiss_index[uname] = faiss.IndexFlatL2(EMBED_DIM)
+
+
+def _get_store(username: Optional[str]) -> Tuple[List[MemoryItem], faiss.IndexFlatL2, str]:
+    """
+    Main internal entrypoint: get (memory_items, faiss_index, normalized_username)
+    for a given username.
+    """
+    uname = _sanitize_username(username)
+    _load_user_store(uname)
+    return _user_memory_items[uname], _user_faiss_index[uname], uname
+
+
+# ========= Core I/O & Embeddings =========
+
+def init_memory(username: Optional[str] = None):
+    """
+    Load FAISS index + memory.json (or memory_<user>.json) if present,
+    otherwise start fresh. Call this once per app startup (or per user if you want).
+
+    Keeping behavior identical for the 'default' user (legacy path).
+    """
+    _get_store(username)
 
 
 def _get_embedding(text: str) -> np.ndarray:
@@ -140,14 +201,17 @@ def _get_embedding(text: str) -> np.ndarray:
     return emb
 
 
-def _save_memory():
+def _save_memory(username: Optional[str] = None):
     """
-    Persist current memory_items + FAISS index to disk.
+    Persist current memory_items + FAISS index to disk for this user.
     """
-    with MEMORY_FILE.open("w", encoding="utf8") as f:
-        json.dump([asdict(m) for m in memory_items], f, ensure_ascii=False, indent=2)
-    faiss.write_index(faiss_index, str(FAISS_FILE))
-    print("💾 Memory saved to disk.")
+    items, index, uname = _get_store(username)
+    json_path, index_path = _paths_for_user(uname)
+
+    with json_path.open("w", encoding="utf8") as f:
+        json.dump([asdict(m) for m in items], f, ensure_ascii=False, indent=2)
+    faiss.write_index(index, str(index_path))
+    print(f"💾 Memory saved to disk for user={uname}.")
 
 
 # ========= DECISION LAYER: useful vs trash =========
@@ -492,6 +556,7 @@ def store_memory(
     text: str,
     source_message: Optional[str] = None,
     created_at: Optional[int] = None,
+    username: Optional[str] = None,
 ):
     """
     Store a single user note string, with classification.
@@ -503,24 +568,24 @@ def store_memory(
     - "user tends to overthink things"             -> trait
     - "user felt romantic attraction to a girl..." -> relationship / story
     """
-    global memory_items, faiss_index
+    items, index, uname = _get_store(username)
 
     text = (text or "").strip()
     if not text:
         return
 
     # Simple dedup: if exact same text exists, just bump importance.
-    for item in memory_items:
+    for item in items:
         if item.text.lower() == text.lower():
             item.importance = min(3, item.importance + 1)
-            print(f"⚠️ Duplicate note, bumping importance: {text}")
-            _save_memory()
+            print(f"⚠️ Duplicate note, bumping importance (user={uname}): {text}")
+            _save_memory(username)
             return
 
     note_type, tags, importance = _classify_note(text)
 
     emb = _get_embedding(text)
-    faiss_index.add(np.array([emb]))
+    index.add(np.array([emb]))
 
     item = MemoryItem(
         text=text,
@@ -530,17 +595,19 @@ def store_memory(
         source_msg=source_message,
         created_at=created_at,
     )
-    memory_items.append(item)
-    print(f"✅ Stored memory note: {item.text}  (type={item.type}, importance={item.importance})")
-    _save_memory()
+    items.append(item)
+    print(f"✅ Stored memory note for user={uname}: {item.text}  (type={item.type}, importance={item.importance})")
+    _save_memory(username)
 
 
-def retrieve_related(query: str, top_k: int = 3) -> List[str]:
+def retrieve_related(query: str, top_k: int = 3, username: Optional[str] = None) -> List[str]:
     """
-    Semantic search over stored user notes.
+    Semantic search over stored user notes for this user.
     Returns the "text" field of the most related notes.
     """
-    if len(memory_items) == 0:
+    items, index, _ = _get_store(username)
+
+    if len(items) == 0:
         return []
 
     query = (query or "").strip()
@@ -548,47 +615,55 @@ def retrieve_related(query: str, top_k: int = 3) -> List[str]:
         return []
 
     qvec = _get_embedding(query)
-    D, I = faiss_index.search(np.array([qvec]), min(top_k, len(memory_items)))
+    D, I = index.search(np.array([qvec]), min(top_k, len(items)))
 
     result: List[str] = []
     for idx in I[0]:
-        if 0 <= idx < len(memory_items):
-            result.append(memory_items[idx].text)
+        if 0 <= idx < len(items):
+            result.append(items[idx].text)
     return result
 
 
-def fetch_memory(query: str, top_k: int = 3) -> List[str]:
+def fetch_memory(query: str, top_k: int = 3, username: Optional[str] = None) -> List[str]:
     """
     Convenience wrapper: returns only note texts.
     """
-    return retrieve_related(query, top_k)
+    return retrieve_related(query, top_k, username=username)
 
 
-def get_all_memory_notes() -> List[str]:
+def get_all_memory_notes(username: Optional[str] = None) -> List[str]:
     """
     For debug / UI panel – only note texts.
     """
-    return [m.text for m in memory_items]
+    items, _, _ = _get_store(username)
+    return [m.text for m in items]
 
 
-def get_structured_memory() -> List[Dict[str, Any]]:
+def get_structured_memory(username: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     For debug / UI panel – full structured items.
     """
-    return [asdict(m) for m in memory_items]
+    items, _, _ = _get_store(username)
+    return [asdict(m) for m in items]
 
 
-def get_memory_count() -> int:
-    return len(memory_items)
+def get_memory_count(username: Optional[str] = None) -> int:
+    items, _, _ = _get_store(username)
+    return len(items)
 
 
-def has_any_memory() -> bool:
-    return len(memory_items) > 0
+def has_any_memory(username: Optional[str] = None) -> bool:
+    items, _, _ = _get_store(username)
+    return len(items) > 0
 
 
 # ========= High-level entrypoint: process each user message =========
 
-def maybe_store_user_message(text: str, msg_index: Optional[int] = None):
+def maybe_store_user_message(
+    text: str,
+    msg_index: Optional[int] = None,
+    username: Optional[str] = None,
+):
     """
     Called once per user message.
 
@@ -628,7 +703,7 @@ def maybe_store_user_message(text: str, msg_index: Optional[int] = None):
 
     if not final_should_store:
         # Debug print so we can see why it was discarded
-        print(f"🗑️ Not storing message: {cleaned!r}  reason={analysis.get('reason')}")
+        print(f"🗑️ Not storing message (user={_sanitize_username(username)}): {cleaned!r}  reason={analysis.get('reason')}")
         return
 
     # 4) Extract structured notes
@@ -639,20 +714,20 @@ def maybe_store_user_message(text: str, msg_index: Optional[int] = None):
         return
 
     if not notes:
-        print(f"⚠️ Analyzer wanted to store, but extractor returned no notes for: {cleaned!r}")
+        print(f"⚠️ Analyzer wanted to store, but extractor returned no notes for (user={_sanitize_username(username)}): {cleaned!r}")
         return
 
     # 5) Store each note
     for note in notes:
         try:
-            store_memory(note, source_message=cleaned, created_at=msg_index)
+            store_memory(note, source_message=cleaned, created_at=msg_index, username=username)
         except Exception as e:
             print("⚠️ Error storing note:", note, e)
 
 
 # ========= High-level Profile Summary (for research/UI) =========
 
-def summarize_user_profile(max_notes: int = 80) -> str:
+def summarize_user_profile(max_notes: int = 80, username: Optional[str] = None) -> str:
     """
     Build a natural-language summary of "who the user is"
     based on stored memory items.
@@ -662,11 +737,13 @@ def summarize_user_profile(max_notes: int = 80) -> str:
       - your research paper (showing emergent persona)
       - UI side panel
     """
-    if not memory_items:
+    items, _, uname = _get_store(username)
+
+    if not items:
         return "no stable info about the user yet."
 
     sorted_items = sorted(
-        memory_items,
+        items,
         key=lambda m: m.importance,
         reverse=True,
     )

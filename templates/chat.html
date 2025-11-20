@@ -22,7 +22,7 @@
         <div class="header-top-row">
           <div class="header-left">
             <div class="header-name-row">
-              <div class="name">Neon Computer</div>
+              <div class="name">Synapse Core M1</div>
               <div class="status-pill">
                 <span class="status-dot"></span>
                 <span>Live Link</span>
@@ -38,6 +38,31 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Small experimental banner button under header -->
+    <div class="experiment-strip" style="margin-top:6px; margin-bottom:6px;">
+      <button
+        id="experimentInfoBtn"
+        type="button"
+        style="
+          border:none;
+          outline:none;
+          cursor:pointer;
+          padding:6px 10px;
+          border-radius:999px;
+          font-size:11px;
+          display:inline-flex;
+          align-items:center;
+          gap:6px;
+          background:rgba(250, 204, 21, 0.12);
+          color:#854d0e;
+          backdrop-filter:blur(6px);
+        "
+      >
+        <span style="font-size:13px;">⚠️</span>
+        <span><strong>Experimental prototype</strong> · research test · <u>read me</u></span>
+      </button>
     </div>
 
     <!-- Messages -->
@@ -77,6 +102,36 @@
         <div class="debug-section">
           <h3>Loading…</h3>
           <div class="debug-empty">Fetching current memory and state…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Experimental / privacy popup -->
+  <div id="experimentOverlay" class="debug-overlay hidden">
+    <div class="debug-modal">
+      <div class="debug-header">
+        <div class="debug-header-title">
+          <span class="main">Experimental prototype – read before using</span>
+          <span class="sub">How your messages are used in this research test</span>
+        </div>
+        <button id="experimentCloseBtn" class="debug-close-btn" type="button">Close</button>
+      </div>
+      <div class="debug-body">
+        <div class="debug-section">
+          <h3>Data & privacy notice</h3>
+          <div class="debug-summary">
+            This chat is an experimental research prototype. Your messages are stored and
+            used to build a long-term memory of the conversation so the AI can "remember"
+            things about you over time.
+          </div>
+          <div class="debug-section" style="margin-top:12px;">
+            <div class="debug-empty" style="text-align:left;">
+              • Do not share passwords, IDs, phone numbers, or financial details.<br>
+              • Avoid talking about highly sensitive topics you wouldn’t write in a normal text.<br>
+              • This is not a production system – it’s for research and testing only.
+            </div>
+          </div>
         </div>
       </div>
     </div>

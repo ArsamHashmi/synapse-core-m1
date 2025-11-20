@@ -8,7 +8,20 @@ const debugOverlay = document.getElementById("debugOverlay");
 const debugCloseBtn = document.getElementById("debugCloseBtn");
 const debugBody = document.getElementById("debugBody");
 
+const experimentInfoBtn = document.getElementById("experimentInfoBtn");
+const experimentOverlay = document.getElementById("experimentOverlay");
+const experimentCloseBtn = document.getElementById("experimentCloseBtn");
+
 let typingBubbleEl = null;
+
+// ---------- USERNAME HANDLING (per-user memory key) ----------
+let username = localStorage.getItem("chat_username");
+
+if (!username) {
+  const raw = window.prompt("Choose a username (this keeps your chats separate):") || "";
+  username = raw.trim() || ("guest_" + Math.floor(Math.random() * 100000));
+  localStorage.setItem("chat_username", username);
+}
 
 // story buffering on frontend
 let pendingChunks = [];        // chunks you already "sent" (pressed Enter)
@@ -47,7 +60,8 @@ function scrollToBottom() {
 
 async function loadHistory() {
   try {
-    const res = await fetch("/messages");
+    // if you update backend to be per-user, this query param will matter
+    const res = await fetch(`/messages?username=${encodeURIComponent(username)}`);
     const data = await res.json();
     messagesEl.innerHTML = "";
     data.forEach(appendMessage);
@@ -56,6 +70,23 @@ async function loadHistory() {
     console.error("Error loading history:", err);
   }
 }
+
+// ----- Experimental / privacy popup logic -----
+function openExperimentPanel() {
+  experimentOverlay.classList.remove("hidden");
+}
+
+function closeExperimentPanel() {
+  experimentOverlay.classList.add("hidden");
+}
+
+experimentInfoBtn.addEventListener("click", openExperimentPanel);
+experimentCloseBtn.addEventListener("click", closeExperimentPanel);
+experimentOverlay.addEventListener("click", (e) => {
+  if (e.target === experimentOverlay) {
+    closeExperimentPanel();
+  }
+});
 
 function showTypingIndicator() {
   if (typingBubbleEl) return;
@@ -154,7 +185,10 @@ async function flushPendingChunks() {
     const res = await fetch("/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: mergedText }),
+      body: JSON.stringify({
+        text: mergedText,
+        username: username,     // <<< send username with message
+      }),
     });
 
     hideTypingIndicator();
@@ -190,10 +224,9 @@ function setSending(isSending) {
 sendBtn.addEventListener("click", sendMessage);
 
 // Key listener:
-//  - Enter => sendMessage (as before)
+//  - Enter => sendMessage
 //  - ANY key while there are pendingChunks => reset inactivity timer
 inputEl.addEventListener("keydown", (e) => {
-  // any key counts as "activity", so reset timer if chunks exist
   bumpActivityTimer();
 
   if (e.key === "Enter" && !e.shiftKey) {
@@ -214,7 +247,7 @@ async function openDebugPanel() {
   `;
 
   try {
-    const res = await fetch("/user_state");
+    const res = await fetch(`/user_state?username=${encodeURIComponent(username)}`);
     if (!res.ok) {
       throw new Error("Failed to fetch /user_state");
     }

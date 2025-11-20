@@ -1,0 +1,161 @@
+[
+  {
+    "text": "user has become close friends with a girl in their class over the last semester",
+    "type": "relationship",
+    "tags": [
+      "close friend",
+      "girl in class"
+    ],
+    "importance": 2,
+    "source_msg": "There’s this girl in my class and we’ve become pretty close over the last semester. We study together and talk about life a lot, and yesterday she hugged me when I told her I was stressed about money and visas. I started blushing and felt this weird mix of comfort and panic because I think I’m actually catching feelings for her, but I’m scared of messing up the friendship.",
+    "created_at": null
+  },
+  {
+    "text": "user studies and has deep life conversations with this girl",
+    "type": "relationship",
+    "tags": [
+      "girl",
+      "studies",
+      "deep conversations"
+    ],
+    "importance": 2,
+    "source_msg": "There’s this girl in my class and we’ve become pretty close over the last semester. We study together and talk about life a lot, and yesterday she hugged me when I told her I was stressed about money and visas. I started blushing and felt this weird mix of comfort and panic because I think I’m actually catching feelings for her, but I’m scared of messing up the friendship.",
+    "created_at": null
+  },
+  {
+    "text": "user is stressed about money and visa issues",
+    "type": "concern",
+    "tags": [
+      "money",
+      "visa issues"
+    ],
+    "importance": 3,
+    "source_msg": "There’s this girl in my class and we’ve become pretty close over the last semester. We study together and talk about life a lot, and yesterday she hugged me when I told her I was stressed about money and visas. I started blushing and felt this weird mix of comfort and panic because I think I’m actually catching feelings for her, but I’m scared of messing up the friendship.",
+    "created_at": null
+  },
+  {
+    "text": "user felt comfort and romantic attraction when this girl hugged them",
+    "type": "story",
+    "tags": [
+      "girl",
+      "hug",
+      "romantic attraction"
+    ],
+    "importance": 2,
+    "source_msg": "There’s this girl in my class and we’ve become pretty close over the last semester. We study together and talk about life a lot, and yesterday she hugged me when I told her I was stressed about money and visas. I started blushing and felt this weird mix of comfort and panic because I think I’m actually catching feelings for her, but I’m scared of messing up the friendship.",
+    "created_at": null
+  },
+  {
+    "text": "user is afraid of ruining the friendship by acting on their romantic feelings",
+    "type": "concern",
+    "tags": [
+      "friendship",
+      "romantic feelings",
+      "fear"
+    ],
+    "importance": 3,
+    "source_msg": "There’s this girl in my class and we’ve become pretty close over the last semester. We study together and talk about life a lot, and yesterday she hugged me when I told her I was stressed about money and visas. I started blushing and felt this weird mix of comfort and panic because I think I’m actually catching feelings for her, but I’m scared of messing up the friendship.",
+    "created_at": null
+  },
+  {
+    "text": "user is a very emotional person who tends to overthink and take things to heart",
+    "type": "trait",
+    "tags": [
+      "emotional",
+      "overthinks",
+      "sensitive"
+    ],
+    "importance": 2,
+    "source_msg": "n general I’m a very emotional person, I overthink everything and take things to heart. I actually enjoy late-night walks, guitar, and horror movies because they calm me down, but crowds and loud parties drain me so much. Lately I’ve been feeling anxious almost every night about my student loans and immigration status. Even when things are going fine, my brain keeps jumping to worst-case scenarios.",
+    "created_at": null
+  },
+  {
+    "text": "user enjoys late-night walks",
+    "type": "preference",
+    "tags": [
+      "late-night",
+      "walks"
+    ],
+    "importance": 1,
+    "source_msg": "n general I’m a very emotional person, I overthink everything and take things to heart. I actually enjoy late-night walks, guitar, and horror movies because they calm me down, but crowds and loud parties drain me so much. Lately I’ve been feeling anxious almost every night about my student loans and immigration status. Even when things are going fine, my brain keeps jumping to worst-case scenarios.",
+    "created_at": null
+  },
+  {
+    "text": "user enjoys playing or listening to guitar",
+    "type": "preference",
+    "tags": [
+      "guitar",
+      "music"
+    ],
+    "importance": 1,
+    "source_msg": "n general I’m a very emotional person, I overthink everything and take things to heart. I actually enjoy late-night walks, guitar, and horror movies because they calm me down, but crowds and loud parties drain me so much. Lately I’ve been feeling anxious almost every night about my student loans and immigration status. Even when things are going fine, my brain keeps jumping to worst-case scenarios.",
+    "created_at": null
+  },
+  {
+    "text": "user enjoys horror movies because they are calming",
+    "type": "preference",
+    "tags": [
+      "horror movies",
+      "calming"
+    ],
+    "importance": 1,
+    "source_msg": "n general I’m a very emotional person, I overthink everything and take things to heart. I actually enjoy late-night walks, guitar, and horror movies because they calm me down, but crowds and loud parties drain me so much. Lately I’ve been feeling anxious almost every night about my student loans and immigration status. Even when things are going fine, my brain keeps jumping to worst-case scenarios.",
+    "created_at": null
+  },
+  {
+    "text": "user feels anxious almost every night about student loans and immigration status",
+    "type": "concern",
+    "tags": [
+      "anxious",
+      "student loans",
+      "immigration status"
+    ],
+    "importance": 3,
+    "source_msg": "n general I’m a very emotional person, I overthink everything and take things to heart. I actually enjoy late-night walks, guitar, and horror movies because they calm me down, but crowds and loud parties drain me so much. Lately I’ve been feeling anxious almost every night about my student loans and immigration status. Even when things are going fine, my brain keeps jumping to worst-case scenarios.",
+    "created_at": null
+  },
+  {
+    "text": "user likes apples",
+    "type": "preference",
+    "tags": [
+      "likes apples",
+      "apples"
+    ],
+    "importance": 1,
+    "source_msg": "i like apples",
+    "created_at": null
+  },
+  {
+    "text": "user likes cats and finds them cute",
+    "type": "preference",
+    "tags": [
+      "likes cats",
+      "cute"
+    ],
+    "importance": 1,
+    "source_msg": "you know what happened today i was going in the park and i saw a small cute cat she was hungry and wanted some food i gave her some milk",
+    "created_at": null
+  },
+  {
+    "text": "user encountered a hungry stray cat in a park today",
+    "type": "story",
+    "tags": [
+      "stray cat",
+      "park"
+    ],
+    "importance": 1,
+    "source_msg": "you know what happened today i was going in the park and i saw a small cute cat she was hungry and wanted some food i gave her some milk",
+    "created_at": null
+  },
+  {
+    "text": "user cared about the cat’s wellbeing and chose to feed her milk",
+    "type": "trait",
+    "tags": [
+      "cat",
+      "caring"
+    ],
+    "importance": 1,
+    "source_msg": "you know what happened today i was going in the park and i saw a small cute cat she was hungry and wanted some food i gave her some milk",
+    "created_at": null
+  }
+]

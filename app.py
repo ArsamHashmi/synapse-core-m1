@@ -30,6 +30,8 @@ def get_messages():
 def send_message():
     data = request.get_json(force=True)
     text = (data.get("text") or "").strip()
+    # username from frontend (fallback to "default")
+    username = (data.get("username") or "default").strip()
 
     if not text:
         return jsonify({"error": "Empty message"}), 400
@@ -44,8 +46,8 @@ def send_message():
     }
     messages.append(user_msg)
 
-    # store memory on the merged text
-    memory_engine.maybe_store_user_message(text)
+    # store memory on the merged text for this username
+    memory_engine.maybe_store_user_message(text, username=username)
 
     # AI reply (raw -> watchman -> postprocess)
     bot_text = generate_bot_reply(text, messages)
@@ -69,9 +71,9 @@ def push_bot_message():
     now = datetime.now().strftime("%H:%M")
 
     bot_msg = {
-      "sender": "bot",
-      "text": text,
-      "time": now,
+        "sender": "bot",
+        "text": text,
+        "time": now,
     }
     messages.append(bot_msg)
 
@@ -82,10 +84,16 @@ def push_bot_message():
 def get_user_state():
     """
     Debug endpoint: exposes what the AI 'knows' and current internal state.
+    Per-user memory: username comes from query param ?username=...
     """
-    memory_notes = memory_engine.get_all_memory_notes()
-    structured_items = memory_engine.get_structured_memory()
-    memory_summary = memory_engine.summarize_user_profile(max_notes=80)
+    username = (request.args.get("username") or "default").strip()
+
+    memory_notes = memory_engine.get_all_memory_notes(username=username)
+    structured_items = memory_engine.get_structured_memory(username=username)
+    memory_summary = memory_engine.summarize_user_profile(
+        max_notes=80,
+        username=username,
+    )
     state_copy = state_engine.get_state_copy()
 
     return jsonify({
