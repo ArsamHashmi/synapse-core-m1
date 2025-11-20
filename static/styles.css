@@ -9,7 +9,7 @@
   --text-soft: #9ca3af;
 }
 
-/* NEW: make page full-height */
+/* page full-height */
 html,
 body {
   height: 100%;
@@ -29,8 +29,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
   position: relative;
+  overflow: hidden;          /* IMPORTANT: body doesn't scroll */
 }
 
 /* Animated grid / sci-fi background overlay */
@@ -286,7 +286,7 @@ body::after {
   flex: 1;
   min-height: 0; /* important for flex scrolling */
   padding: 12px 10px 8px;
-  overflow-y: auto;
+  overflow-y: auto;    /* only messages scroll */
   background: radial-gradient(circle at top left, rgba(37,99,235,0.16), transparent 60%),
               radial-gradient(circle at bottom right, rgba(16,185,129,0.16), transparent 60%),
               rgba(2, 6, 23, 0.9);
@@ -401,15 +401,11 @@ body::after {
 
 /* Input area */
 .chat-input-area {
-  /* NEW: keep it visually at the bottom and respect safe area */
-  position: sticky;
+  position: sticky;  /* sticks to bottom of chat-wrapper, not scrolling away */
   bottom: 0;
-
   padding: 9px 10px;
   padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
-  /* optional older iOS syntax */
   padding-bottom: calc(9px + constant(safe-area-inset-bottom, 0px));
-
   border-top: 1px solid rgba(30, 64, 175, 0.9);
   background: radial-gradient(circle at bottom, rgba(30,64,175,0.45), transparent 60%),
               rgba(2,6,23,0.96);
@@ -674,10 +670,17 @@ body::after {
   color: #6b7280;
 }
 
+/* MOBILE FINE-TUNE */
 @media (max-width: 480px) {
+  body {
+    align-items: flex-start;
+  }
+
   .chat-wrapper {
-    height: 100vh;
-    max-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;   /* fill viewport height on phones */
+    max-height: 100dvh;
     border-radius: 0;
   }
 
