@@ -1,0 +1,713 @@
+# memory_engine.py
+from __future__ import annotations
+
+from pathlib import Path
+import json
+from dataclasses import dataclass, asdict
+from typing import List, Dict, Any, Optional, Tuple
+
+import faiss
+import numpy as np
+from openai import OpenAI
+
+# ========= OpenAI + Embedding config =========
+
+MEMORY_FILE = Path("memory.json")
+FAISS_FILE = Path("memory.index")
+EMBED_DIM = 1536
+EMBED_MODEL = "text-embedding-3-small"
+
+client = OpenAI()
+
+
+# ========= Structured Memory Item =========
+
+@dataclass
+class MemoryItem:
+    """
+    A single memory fact about the user.
+
+    text:
+        human-readable note (e.g. "user likes horror movies")
+
+    type:
+        high-level category (one of):
+          - identity           (where they live, study, work, background)
+          - preference         (likes/dislikes, hobbies, tastes, social style)
+          - trait              (stable traits: overthinker, ambitious, shy, etc.)
+          - goal               (short/long-term goals, ambitions, dreams)
+          - concern            (ongoing anxieties about career, health, money, etc.)
+          - relationship       (family/partner/friend roles that matter to them)
+          - story              (memories, important events, emotional incidents)
+          - mood_pattern       (recurring emotional tendencies)
+          - other              (doesn’t fit but still useful)
+          - legacy             (old notes from earlier versions)
+
+    tags:
+        list of short keywords (e.g. ["movies", "horror"])
+
+    importance:
+        1–3 (3 = very central / repeated / emotionally loaded)
+
+    source_msg:
+        original user message snippet (optional)
+
+    created_at:
+        optional turn index or timestamp (you can wire this from the main app)
+    """
+    text: str
+    type: str = "other"
+    tags: List[str] | None = None
+    importance: int = 1
+    source_msg: str | None = None
+    created_at: int | None = None
+
+
+# FAISS index + in-memory memory items
+faiss_index: faiss.IndexFlatL2 = faiss.IndexFlatL2(EMBED_DIM)
+memory_items: List[MemoryItem] = []
+
+
+# ========= Core I/O & Embeddings =========
+
+def init_memory():
+    """
+    Load FAISS index + memory.json if present, otherwise start fresh.
+    Call this once at app startup.
+    """
+    global faiss_index, memory_items
+
+    if MEMORY_FILE.exists() and FAISS_FILE.exists():
+        print("🔄 Loading existing memory...")
+
+        with MEMORY_FILE.open("r", encoding="utf8") as f:
+            raw = json.load(f)
+
+        loaded_items: List[MemoryItem] = []
+        if isinstance(raw, list):
+            for entry in raw:
+                # legacy: list of strings
+                if isinstance(entry, str):
+                    loaded_items.append(
+                        MemoryItem(
+                            text=entry,
+                            type="legacy",
+                            tags=[],
+                            importance=1,
+                            source_msg=None,
+                            created_at=None,
+                        )
+                    )
+                # new: list of dicts with at least "text"
+                elif isinstance(entry, dict) and "text" in entry:
+                    loaded_items.append(
+                        MemoryItem(
+                            text=entry.get("text", "").strip(),
+                            type=entry.get("type", "other") or "other",
+                            tags=entry.get("tags") or [],
+                            importance=int(entry.get("importance", 1)),
+                            source_msg=entry.get("source_msg"),
+                            created_at=entry.get("created_at"),
+                        )
+                    )
+
+        memory_items = [m for m in loaded_items if m.text]
+
+        faiss_index = faiss.read_index(str(FAISS_FILE))
+
+        if faiss_index.ntotal != len(memory_items):
+            print(
+                f"⚠️ Index/text size mismatch (index={faiss_index.ntotal}, "
+                f"items={len(memory_items)}). Using the smaller count."
+            )
+            n = min(faiss_index.ntotal, len(memory_items))
+            memory_items = memory_items[:n]
+        print(f"✅ Loaded {len(memory_items)} memory items.")
+    else:
+        print("🆕 Starting fresh memory.")
+        faiss_index = faiss.IndexFlatL2(EMBED_DIM)
+        memory_items = []
+
+
+def _get_embedding(text: str) -> np.ndarray:
+    resp = client.embeddings.create(
+        model=EMBED_MODEL,
+        input=text,
+    )
+    emb = np.array(resp.data[0].embedding, dtype="float32")
+    if emb.shape[0] != EMBED_DIM:
+        raise ValueError(f"Embedding dim mismatch: expected {EMBED_DIM}, got {emb.shape[0]}")
+    return emb
+
+
+def _save_memory():
+    """
+    Persist current memory_items + FAISS index to disk.
+    """
+    with MEMORY_FILE.open("w", encoding="utf8") as f:
+        json.dump([asdict(m) for m in memory_items], f, ensure_ascii=False, indent=2)
+    faiss.write_index(faiss_index, str(FAISS_FILE))
+    print("💾 Memory saved to disk.")
+
+
+# ========= DECISION LAYER: useful vs trash =========
+
+def _analyze_message_for_memory(user_text: str) -> Dict[str, Any]:
+    """
+    Decide if a message contains user info worth logging.
+
+    This is the MOST critical step:
+      - It must detect identity, preferences, goals, worries,
+        relationships, stories, traits, patterns, etc.
+      - It must NOT be fooled by generic world facts.
+
+    We ask the LLM for a compact JSON decision, plus we still have
+    some local heuristics to backstop obvious cases.
+    """
+    user_text = (user_text or "").strip()
+    if not user_text:
+        return {
+            "should_store": False,
+            "reason": "empty",
+            "signals": {},
+        }
+
+    system_prompt = """
+You decide if a single user message is worth saving as memory.
+
+The system is building a MODEL OF THE USER, not world facts.
+
+You MUST NOT miss important personal information.
+If the message clearly reveals anything about WHO THEY ARE or HOW THEY FEEL,
+you should treat it as useful.
+
+Things we WANT to store (any of these is enough):
+- identity: where they live/are from, what they study or do, background.
+- preferences: likes/dislikes, hobbies, tastes, social style.
+- goals: what they want to achieve or become (short or long term).
+- concerns: ongoing worries (career, health, money, relationships, feeling lost).
+- relationships: important people in their life and feelings about them.
+- stories: personal events or memories (especially emotional ones).
+- traits / patterns: overthinks, impulsive, shy, ambitious, etc.
+- mood patterns: often anxious, often numb, etc.
+- how they feel about this chat / the AI.
+
+IMPORTANT:
+- ANY emotionally meaningful story involving another person (crush, fight, breakup, etc.)
+  is considered useful memory.
+- If in doubt between "store" or "not", choose **store**.
+
+Things we usually DO NOT store:
+- general world facts (earth is round, math formulas, news not tied to them).
+- one-off mechanical actions (turning pages, grabbing water).
+- pure small talk ("lol", "ok", "hahaha").
+- pure app/meta talk (bugs, glitches, lag) with no self info.
+
+Output format (JSON ONLY, no comments, no extra text):
+
+{
+  "should_store": true/false,
+  "confidence": 0-100,
+  "categories": ["identity", "preference", ...],
+  "has_emotion": true/false,
+  "is_about_self": true/false,
+  "reason": "short human-readable explanation"
+}
+"""
+
+    msgs = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_text},
+    ]
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-5.1",
+            messages=msgs,
+            temperature=0.0,
+            max_completion_tokens=96,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        data = json.loads(raw)
+        # light sanitation
+        data.setdefault("should_store", False)
+        data.setdefault("confidence", 0)
+        data.setdefault("categories", [])
+        data.setdefault("has_emotion", False)
+        data.setdefault("is_about_self", False)
+        data.setdefault("reason", "")
+        return data
+    except Exception as e:
+        print("⚠️ Error in _analyze_message_for_memory:", e)
+        # fallback: conservative (don't store) – heuristics will still override
+        return {
+            "should_store": False,
+            "confidence": 0,
+            "categories": [],
+            "has_emotion": False,
+            "is_about_self": False,
+            "reason": "analyzer_error",
+        }
+
+
+def _obvious_heuristic_should_store(text: str) -> bool:
+    """
+    Local backstop so we don't depend 100% on LLM.
+    If these patterns hit, we *force* storage, because they're almost
+    always user-relevant.
+
+    This is small and generic on purpose, NOT a giant if/else tree.
+    """
+    t = text.lower()
+
+    # strong self-reference signals
+    self_markers = ["i ", "i'm ", "im ", "my ", "me ", "mine ", "i was ", "i feel ", "i felt "]
+    if not any(m in t for m in self_markers):
+        return False
+
+    # strong preference / dislike markers
+    if any(k in t for k in ["i love ", "i hate ", "i like ", "i don't like", "i dont like"]):
+        return True
+
+    # clear concern markers
+    if any(k in t for k in ["i'm worried", "im worried", "i am worried", "i'm scared", "im scared",
+                            "i'm stressed", "im stressed", "i feel lost", "i'm lost", "im lost"]):
+        return True
+
+    # romantic / emotional interpersonal events
+    if any(k in t for k in ["crush", "in love", "broke up", "breakup", "relationship", "dating"]):
+        return True
+    if "girl in my class" in t or "boy in my class" in t:
+        return True
+    if "i started blushing" in t or "i was blushing" in t:
+        return True
+
+    # goals / dreams
+    if any(k in t for k in ["i want to", "i wanna", "my dream is", "i wish i could"]):
+        return True
+
+    return False
+
+
+# ========= EXTRACTION LAYER: build notes from useful messages =========
+
+def extract_user_notes(user_text: str) -> List[str]:
+    """
+    Use GPT to pull out ANY useful info about the user from a single message:
+
+    - identity (where they live, what they study/do)
+    - stable preferences (likes/dislikes, hobbies, taste)
+    - goals & dreams (career, life, travel, money, etc.)
+    - ongoing concerns/problems (career, money, health, relationships, feeling lost)
+    - relationships (family, partner, friends) AND feelings about them
+    - meaningful memories (e.g. "user has a memory about ...")
+    - personality traits or patterns (e.g. overthinks, ambitious, perfectionist)
+    - recurring mood patterns (e.g. often anxious about future)
+
+    IMPORTANT: also store emotionally meaningful single events, e.g.:
+    - "there is a girl in my class and she talked to me today and i started blushing and i felt something for her"
+      -> user felt romantic attraction to a girl in their class today
+
+    The model MUST NOT guess. If nothing clear, return [].
+    """
+
+    system_prompt = """
+You log facts about the USER from a single message.
+
+Goal:
+- Capture anything that helps understand WHO THEY ARE, WHAT THEY CARE ABOUT,
+  WHAT THEY WANT, and HOW THEY FEEL.
+
+You must NOT miss emotionally significant or personal info.
+If they talk about a crush, breakup, argument, or strong reaction, treat it as useful.
+
+Your job:
+- Extract up to FIVE short, concrete notes, such as:
+  - identity (where they live, what they study or do)
+  - stable likes/dislikes (food, hobbies, topics, music, style)
+  - long-term goals or dreams (career, life, travel, money, family)
+  - ongoing concerns / problems (career, money, health, relationships, studies, feeling lost)
+  - relationships they mention (e.g. "younger sister", "mom", "girl in their class")
+    AND how they feel about them (e.g. crush, tension, close, distant).
+  - meaningful memories or stories they mention (e.g. childhood, important events)
+    For those, write them as: "user has a memory about ..."
+  - personality traits that clearly show up (e.g. "user tends to overthink", "user is very ambitious")
+  - recurring mood patterns IF stated (e.g. "user often feels anxious about the future")
+
+Very important example:
+Message: "there is a girl in my class and she talked to me today and i started blushing and i felt something for her. lol"
+You MUST produce a note like:
+  user felt romantic attraction to a girl in their class today
+
+Format:
+- Return each note on its own line.
+- Each note MUST be a short sentence starting with "user".
+  Examples:
+    user likes strawberries
+    user lives in chicago
+    user is worried about their career path
+    user wants to start their own business
+    user has a childhood memory about playing with a ball
+    user tends to overthink things
+    user often feels anxious about their future
+    user felt romantic attraction to a girl in their class
+
+Rules:
+- Do NOT invent or guess hidden facts.
+- Only use what is explicitly or VERY clearly implied by the message.
+- Do NOT write temporary tiny moods like "user is tired today".
+- Do NOT include generic lines like "user sent a message" or "user is talking to emily".
+- If there is ZERO clear info about the user, return exactly: NONE
+"""
+
+    msgs = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_text},
+    ]
+
+    resp = client.chat.completions.create(
+        model="gpt-5.1",
+        messages=msgs,
+        temperature=0.0,
+        max_completion_tokens=160,
+    )
+
+    content = (resp.choices[0].message.content or "").strip()
+    if not content or content.upper().startswith("NONE"):
+        return []
+
+    notes: List[str] = []
+    for line in content.splitlines():
+        line = line.strip().lstrip("-").strip()
+        if not line:
+            continue
+        if len(line) > 220:
+            line = line[:220]
+        notes.append(line)
+
+    return notes
+
+
+# ========= Note Classification =========
+
+def _classify_note(note_text: str) -> Tuple[str, List[str], int]:
+    """
+    Classify a memory note into a type + tags + importance.
+
+    Types:
+      - identity
+      - preference
+      - trait
+      - goal
+      - concern
+      - relationship
+      - story
+      - mood_pattern
+      - other
+      - legacy
+    """
+    note_text = (note_text or "").strip()
+    if not note_text:
+        return "other", [], 1
+
+    system_prompt = """
+You are classifying ONE short memory note about a user.
+
+Return a compact JSON object with this exact structure:
+{
+  "type": "...",
+  "tags": ["...", "..."],
+  "importance": 1
+}
+
+Allowed "type" values:
+- "identity"
+- "preference"
+- "trait"
+- "goal"
+- "concern"
+- "relationship"
+- "story"
+- "mood_pattern"
+- "other"
+- "legacy"
+
+Guidelines:
+- "identity": where they live, study, work, or their background.
+- "preference": likes/dislikes, hobbies, taste in music/food/etc.
+- "trait": stable personality traits (overthinks, ambitious, shy, chaotic, etc.).
+- "goal": anything they want to achieve, become, or change (short-term or long-term).
+- "concern": ongoing worries about future, career, money, health, relationships, etc.
+- "relationship": info about family/partner/friends or other important people (e.g. a girl in their class) and their role.
+- "story": memories or personal stories (especially childhood, key events, emotional incidents).
+- "mood_pattern": recurring emotional tendencies (e.g. often anxious, often numb).
+- "other": if none of the above clearly fits.
+- "legacy": only if the note is obviously from an older, untyped system (not needed for new ones).
+
+"tags":
+- Short keywords only, 1–3 words each.
+- Derived ONLY from the note text, do not invent new facts.
+
+"importance":
+- 1 if it's a small detail.
+- 2 if it matters for who they are.
+- 3 if it seems central, emotionally heavy, or clearly important.
+
+Do NOT explain.
+Do NOT add extra fields.
+ONLY return the JSON object.
+"""
+
+    msgs = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": note_text},
+    ]
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-5.1",
+            messages=msgs,
+            temperature=0.0,
+            max_completion_tokens=64,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        data = json.loads(raw)
+        note_type = str(data.get("type", "other")).strip() or "other"
+        tags = data.get("tags") or []
+        if not isinstance(tags, list):
+            tags = []
+        tags = [str(t).strip() for t in tags if str(t).strip()]
+        importance = int(data.get("importance", 1))
+        if importance < 1 or importance > 3:
+            importance = 1
+        return note_type, tags, importance
+    except Exception as e:
+        print("⚠️ Error in _classify_note:", e)
+        return "other", [], 1
+
+
+# ========= Public Memory Ops =========
+
+def store_memory(
+    text: str,
+    source_message: Optional[str] = None,
+    created_at: Optional[int] = None,
+):
+    """
+    Store a single user note string, with classification.
+
+    Examples:
+    - "user likes strawberries"                    -> preference
+    - "user is worried about their career"         -> concern
+    - "user has a childhood memory about X"        -> story
+    - "user tends to overthink things"             -> trait
+    - "user felt romantic attraction to a girl..." -> relationship / story
+    """
+    global memory_items, faiss_index
+
+    text = (text or "").strip()
+    if not text:
+        return
+
+    # Simple dedup: if exact same text exists, just bump importance.
+    for item in memory_items:
+        if item.text.lower() == text.lower():
+            item.importance = min(3, item.importance + 1)
+            print(f"⚠️ Duplicate note, bumping importance: {text}")
+            _save_memory()
+            return
+
+    note_type, tags, importance = _classify_note(text)
+
+    emb = _get_embedding(text)
+    faiss_index.add(np.array([emb]))
+
+    item = MemoryItem(
+        text=text,
+        type=note_type,
+        tags=tags,
+        importance=importance,
+        source_msg=source_message,
+        created_at=created_at,
+    )
+    memory_items.append(item)
+    print(f"✅ Stored memory note: {item.text}  (type={item.type}, importance={item.importance})")
+    _save_memory()
+
+
+def retrieve_related(query: str, top_k: int = 3) -> List[str]:
+    """
+    Semantic search over stored user notes.
+    Returns the "text" field of the most related notes.
+    """
+    if len(memory_items) == 0:
+        return []
+
+    query = (query or "").strip()
+    if not query:
+        return []
+
+    qvec = _get_embedding(query)
+    D, I = faiss_index.search(np.array([qvec]), min(top_k, len(memory_items)))
+
+    result: List[str] = []
+    for idx in I[0]:
+        if 0 <= idx < len(memory_items):
+            result.append(memory_items[idx].text)
+    return result
+
+
+def fetch_memory(query: str, top_k: int = 3) -> List[str]:
+    """
+    Convenience wrapper: returns only note texts.
+    """
+    return retrieve_related(query, top_k)
+
+
+def get_all_memory_notes() -> List[str]:
+    """
+    For debug / UI panel – only note texts.
+    """
+    return [m.text for m in memory_items]
+
+
+def get_structured_memory() -> List[Dict[str, Any]]:
+    """
+    For debug / UI panel – full structured items.
+    """
+    return [asdict(m) for m in memory_items]
+
+
+def get_memory_count() -> int:
+    return len(memory_items)
+
+
+def has_any_memory() -> bool:
+    return len(memory_items) > 0
+
+
+# ========= High-level entrypoint: process each user message =========
+
+def maybe_store_user_message(text: str, msg_index: Optional[int] = None):
+    """
+    Called once per user message.
+
+    Pipeline:
+      1) Fast cleaning & length check.
+      2) Analyzer LLM decides if it should be stored + why.
+      3) Local heuristics force storage for obvious important cases.
+      4) If final decision is "store", call extract_user_notes().
+      5) For each extracted note, call store_memory().
+    """
+    cleaned = (text or "").strip()
+    if not cleaned or len(cleaned) < 3:
+        return
+
+    # 1) Ask the analyzer LLM
+    analysis = _analyze_message_for_memory(cleaned)
+    should_store_llm = bool(analysis.get("should_store", False))
+    confidence = int(analysis.get("confidence", 0) or 0)
+
+    # 2) Local backstop (for things like "i hate maths", "i started blushing", etc.)
+    should_store_heuristic = _obvious_heuristic_should_store(cleaned)
+
+    # 3) Final decision logic
+    #    - If either LLM or heuristic says yes, we store.
+    #    - We only completely skip when BOTH are negative and LLM is confident.
+    final_should_store = False
+    if should_store_heuristic:
+        final_should_store = True
+    elif should_store_llm:
+        final_should_store = True
+    else:
+        # LLM said no, heuristic said no -> if low confidence, be conservative & store anyway.
+        if confidence < 40:
+            final_should_store = True
+        else:
+            final_should_store = False
+
+    if not final_should_store:
+        # Debug print so we can see why it was discarded
+        print(f"🗑️ Not storing message: {cleaned!r}  reason={analysis.get('reason')}")
+        return
+
+    # 4) Extract structured notes
+    try:
+        notes = extract_user_notes(cleaned)
+    except Exception as e:
+        print("⚠️ Error in extract_user_notes:", e)
+        return
+
+    if not notes:
+        print(f"⚠️ Analyzer wanted to store, but extractor returned no notes for: {cleaned!r}")
+        return
+
+    # 5) Store each note
+    for note in notes:
+        try:
+            store_memory(note, source_message=cleaned, created_at=msg_index)
+        except Exception as e:
+            print("⚠️ Error storing note:", note, e)
+
+
+# ========= High-level Profile Summary (for research/UI) =========
+
+def summarize_user_profile(max_notes: int = 80) -> str:
+    """
+    Build a natural-language summary of "who the user is"
+    based on stored memory items.
+
+    For:
+      - debugging
+      - your research paper (showing emergent persona)
+      - UI side panel
+    """
+    if not memory_items:
+        return "no stable info about the user yet."
+
+    sorted_items = sorted(
+        memory_items,
+        key=lambda m: m.importance,
+        reverse=True,
+    )
+    notes = [m.text for m in sorted_items[:max_notes]]
+    joined = "\n".join(f"- {n}" for n in notes)
+
+    system_prompt = """
+You are summarizing a user's personality and life based on memory notes.
+
+Input:
+- A list of short "user ..." facts and stories.
+
+Output:
+- A short, human-readable summary (1–3 short paragraphs) describing:
+  - who they are (identity/background),
+  - what they like/dislike,
+  - their goals and concerns,
+  - their relationships (high-level only),
+  - their personality traits and patterns,
+  - any recurring themes or stories.
+
+Rules:
+- DO NOT add new facts that are not in the notes.
+- You may gently compress similar notes, but stay faithful.
+- Keep it informal but clear, like you're describing a friend.
+"""
+
+    msgs = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": joined},
+    ]
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-5.1",
+            messages=msgs,
+            temperature=0.4,
+            max_completion_tokens=220,
+        )
+        summary = (resp.choices[0].message.content or "").strip()
+        return summary or "profile summary is empty."
+    except Exception as e:
+        print("⚠️ Error in summarize_user_profile:", e)
+        return "profile summary unavailable due to an error."

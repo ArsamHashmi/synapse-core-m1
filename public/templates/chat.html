@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat with Computer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    :root {
+      --bg-main: #020617;
+      --glass-bg: rgba(15, 23, 42, 0.75);
+      --border-glow: rgba(94, 234, 212, 0.8);
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-purple: #a855f7;
+      --text-main: #e5e7eb;
+      --text-soft: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                   "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top left, #0b1120 0, #020617 45%, #000 100%);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Animated grid / sci-fi background overlay */
+    body::before,
+    body::after {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background-image:
+        linear-gradient(rgba(15, 23, 42, 0.65) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.65) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.35;
+      animation: gridMove 22s linear infinite;
+      pointer-events: none;
+      z-index: -2;
+    }
+
+    body::after {
+      background-image:
+        linear-gradient(rgba(56, 189, 248, 0.16) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(129, 140, 248, 0.16) 1px, transparent 1px);
+      mix-blend-mode: screen;
+      opacity: 0.25;
+      animation-duration: 32s;
+      animation-direction: reverse;
+    }
+
+    @keyframes gridMove {
+      0%   { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-48px, -48px, 0); }
+    }
+
+    /* Glow orbs in background */
+    .orb {
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(60px);
+      opacity: 0.32;
+      mix-blend-mode: screen;
+      z-index: -1;
+    }
+    .orb.orb-1 {
+      width: 260px; height: 260px;
+      background: #22c55e;
+      top: 4%; left: 10%;
+    }
+    .orb.orb-2 {
+      width: 280px; height: 280px;
+      background: #38bdf8;
+      bottom: 0%; right: 5%;
+    }
+    .orb.orb-3 {
+      width: 220px; height: 220px;
+      background: #a855f7;
+      bottom: -8%; left: -4%;
+    }
+
+    .chat-wrapper {
+      width: 100%;
+      max-width: 440px;
+      height: 90vh;
+      max-height: 780px;
+      border-radius: 28px;
+      background: linear-gradient(
+          135deg,
+          rgba(15, 23, 42, 0.85),
+          rgba(15, 23, 42, 0.96)
+        );
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow:
+        0 0 0 1px rgba(15, 23, 42, 0.8),
+        0 18px 45px rgba(15, 23, 42, 0.98),
+        0 0 60px rgba(56, 189, 248, 0.32);
+      backdrop-filter: blur(22px);
+    }
+
+    /* Neon border glow */
+    .chat-wrapper::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      background: conic-gradient(
+        from 180deg,
+        rgba(56, 189, 248, 0.6),
+        rgba(168, 85, 247, 0.6),
+        rgba(34, 197, 94, 0.6),
+        rgba(251, 191, 36, 0.6),
+        rgba(56, 189, 248, 0.6)
+      );
+      opacity: 0;
+      filter: blur(16px);
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .chat-wrapper:hover::before {
+      opacity: 0.8;
+    }
+
+    /* Header */
+    .chat-header {
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.95);
+      background: radial-gradient(circle at top left, rgba(56,189,248,0.30), transparent 60%),
+                  radial-gradient(circle at top right, rgba(168,85,247,0.18), transparent 60%),
+                  rgba(15,23,42,0.92);
+    }
+
+    .avatar {
+      position: relative;
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 20% 20%, #f9fafb, #0f172a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e5e7eb;
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow:
+        0 0 0 1px rgba(148, 163, 184, 0.6),
+        0 8px 18px rgba(15, 23, 42, 0.9),
+        0 0 26px rgba(56, 189, 248, 0.9);
+      overflow: hidden;
+    }
+
+    .avatar::before {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      border-radius: inherit;
+      border: 1px solid rgba(56, 189, 248, 0.7);
+      opacity: 0.8;
+      animation: pulseRing 2.4s ease-out infinite;
+    }
+
+    @keyframes pulseRing {
+      0%   { transform: scale(0.9); opacity: 0.8; }
+      70%  { transform: scale(1.2); opacity: 0; }
+      100% { transform: scale(1.2); opacity: 0; }
+    }
+
+    .header-text {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .header-top-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .header-left {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-text .name {
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.24), rgba(15,23,42,0.95));
+      font-size: 10px;
+      color: #bbf7d0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34,197,94,0.9);
+      animation: statusBlink 1.8s ease-in-out infinite;
+    }
+
+    @keyframes statusBlink {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50%      { transform: scale(0.7); opacity: 0.6; }
+    }
+
+    .header-subtitle {
+      font-size: 11px;
+      color: var(--text-soft);
+      margin-top: 3px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .debug-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      background: rgba(15, 23, 42, 0.85);
+      color: #e5e7eb;
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(10px);
+      transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    }
+
+    .debug-btn span.icon {
+      font-size: 12px;
+      color: #38bdf8;
+    }
+
+    .debug-btn:hover {
+      background: rgba(30, 64, 175, 0.85);
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.8),
+                  0 6px 16px rgba(15, 23, 42, 0.95);
+    }
+
+    /* Messages area */
+    .chat-body {
+      flex: 1;
+      padding: 12px 10px 8px;
+      overflow-y: auto;
+      background: radial-gradient(circle at top left, rgba(37,99,235,0.16), transparent 60%),
+                  radial-gradient(circle at bottom right, rgba(16,185,129,0.16), transparent 60%),
+                  rgba(2, 6, 23, 0.9);
+      position: relative;
+    }
+
+    .messages {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .message-row {
+      display: flex;
+      margin: 2px 0;
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+      animation: msgIn 0.18s ease-out forwards;
+    }
+
+    @keyframes msgIn {
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .message-row.user {
+      justify-content: flex-end;
+    }
+
+    .message-row.bot {
+      justify-content: flex-start;
+    }
+
+    .bubble {
+      max-width: 80%;
+      padding: 9px 11px 6px;
+      border-radius: 18px;
+      font-size: 13px;
+      line-height: 1.4;
+      position: relative;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.95);
+    }
+
+    .message-row.user .bubble {
+      background: radial-gradient(circle at top left, #22c55e, #0f766e);
+      color: #ecfdf5;
+      border-bottom-right-radius: 4px;
+      box-shadow:
+        0 0 0 1px rgba(16, 185, 129, 0.45),
+        0 8px 20px rgba(16, 185, 129, 0.48);
+    }
+
+    .message-row.bot .bubble {
+      background: linear-gradient(
+        135deg,
+        rgba(15, 23, 42, 0.96),
+        rgba(15, 23, 42, 1)
+      );
+      color: #e5e7eb;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      border-bottom-left-radius: 4px;
+      box-shadow:
+        0 0 0 1px rgba(15, 23, 42, 0.9),
+        0 10px 26px rgba(15, 23, 42, 0.95);
+    }
+
+    .bubble:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        0 0 0 1px rgba(148, 163, 184, 0.6),
+        0 14px 30px rgba(15, 23, 42, 1);
+    }
+
+    .time {
+      font-size: 10px;
+      opacity: 0.72;
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    /* Typing indicator bubble */
+    .typing-bubble {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #9ca3af;
+      opacity: 0.6;
+      animation: typingBlink 1s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    @keyframes typingBlink {
+      0%, 100% { transform: translateY(0); opacity: 0.4; }
+      50%      { transform: translateY(-2px); opacity: 1; }
+    }
+
+    /* Input area */
+    .chat-input-area {
+      padding: 9px 10px;
+      border-top: 1px solid rgba(30, 64, 175, 0.9);
+      background: radial-gradient(circle at bottom, rgba(30,64,175,0.45), transparent 60%),
+                  rgba(2,6,23,0.96);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .input-box {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 999px;
+      border: 1px solid rgba(51, 65, 85, 0.95);
+      padding: 7px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow:
+        0 0 0 1px rgba(15, 23, 42, 1),
+        0 6px 12px rgba(15, 23, 42, 0.95);
+    }
+
+    .input-icon {
+      font-size: 13px;
+      opacity: 0.65;
+    }
+
+    .input-box input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text-main);
+      font-size: 13px;
+    }
+
+    .input-box input::placeholder {
+      color: #6b7280;
+    }
+
+    .send-btn {
+      border: none;
+      outline: none;
+      border-radius: 999px;
+      padding: 9px 15px;
+      background: radial-gradient(circle at top left, var(--accent-blue), var(--accent-purple));
+      color: #f9fafb;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow:
+        0 0 0 1px rgba(59, 130, 246, 0.9),
+        0 10px 22px rgba(37, 99, 235, 0.75);
+      transition:
+        transform 0.1s ease,
+        box-shadow 0.1s ease,
+        filter 0.15s ease,
+        opacity 0.15s ease;
+    }
+
+    .send-icon {
+      font-size: 14px;
+      transform: translateY(0.5px);
+    }
+
+    .send-btn:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+      box-shadow:
+        0 0 0 1px rgba(59, 130, 246, 1),
+        0 14px 28px rgba(37, 99, 235, 0.95);
+    }
+
+    .send-btn:active {
+      transform: translateY(0.5px) scale(0.97);
+      box-shadow:
+        0 0 0 1px rgba(37, 99, 235, 1),
+        0 8px 16px rgba(15, 23, 42, 0.98);
+    }
+
+    .send-btn.disabled {
+      opacity: 0.4;
+      cursor: default;
+      box-shadow: none;
+      filter: none;
+    }
+
+    /* Scrollbar styling */
+    .chat-body::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chat-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .chat-body::-webkit-scrollbar-thumb {
+      background: rgba(55, 65, 81, 0.9);
+      border-radius: 999px;
+    }
+
+    /* Debug / Memory modal */
+    .debug-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.75);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 40;
+      backdrop-filter: blur(10px);
+    }
+
+    .debug-overlay.hidden {
+      display: none;
+    }
+
+    .debug-modal {
+      width: 100%;
+      max-width: 520px;
+      max-height: 80vh;
+      background: radial-gradient(circle at top left, rgba(56,189,248,0.18), transparent 55%),
+                  radial-gradient(circle at bottom right, rgba(34,197,94,0.16), transparent 55%),
+                  rgba(15,23,42,0.98);
+      border-radius: 20px;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      box-shadow:
+        0 0 0 1px rgba(15,23,42,1),
+        0 18px 36px rgba(15,23,42,1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .debug-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(51,65,85,0.95);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    .debug-header-title {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .debug-header-title span.main {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+
+    .debug-header-title span.sub {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .debug-close-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.7);
+      background: rgba(15,23,42,0.9);
+      color: #e5e7eb;
+      padding: 4px 9px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .debug-body {
+      padding: 10px 14px 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .debug-section {
+      border-radius: 10px;
+      border: 1px solid rgba(51,65,85,0.95);
+      background: rgba(15,23,42,0.96);
+      padding: 8px 10px;
+    }
+
+    .debug-section h3 {
+      margin: 0 0 4px 0;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+    }
+
+    .debug-kv {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+
+    .debug-kv span.key {
+      color: #9ca3af;
+    }
+
+    .debug-kv span.value {
+      color: #e5e7eb;
+      font-weight: 500;
+    }
+
+    .debug-tags {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .debug-tag {
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(55,65,81,0.9);
+      font-size: 11px;
+      color: #e5e7eb;
+      background: rgba(15,23,42,1);
+    }
+
+    .debug-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .debug-list li {
+      border-radius: 8px;
+      border: 1px solid rgba(55,65,81,0.9);
+      padding: 4px 6px;
+      color: #e5e7eb;
+      background: rgba(15,23,42,1);
+    }
+
+    .concern-type {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #facc15;
+      margin-bottom: 1px;
+    }
+
+    .concern-text {
+      font-size: 12px;
+    }
+
+    .debug-empty {
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    @media (max-width: 480px) {
+      .chat-wrapper {
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+      }
+
+      .debug-modal {
+        max-width: 94%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="chat-wrapper">
+    <!-- Header -->
+    <div class="chat-header">
+      <div class="avatar">AI</div>
+      <div class="header-text">
+        <div class="header-top-row">
+          <div class="header-left">
+            <div class="header-name-row">
+              <div class="name">Neon Computer</div>
+              <div class="status-pill">
+                <span class="status-dot"></span>
+                <span>Live Link</span>
+              </div>
+            </div>
+            <div class="header-subtitle">Talking to a simulated intelligence</div>
+          </div>
+          <div class="header-actions">
+            <button id="debugBtn" class="debug-btn" type="button">
+              <span class="icon">☰</span>
+              <span>Memory</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="chat-body" id="chatBody">
+      <div class="messages" id="messages"></div>
+    </div>
+
+    <!-- Input -->
+    <div class="chat-input-area">
+      <div class="input-box">
+        <span class="input-icon">⌘</span>
+        <input
+          id="messageInput"
+          type="text"
+          placeholder="Type a message to the computer..."
+          autocomplete="off"
+        />
+      </div>
+      <button id="sendBtn" class="send-btn">
+        <span class="send-icon">➤</span>
+        <span>Send</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Debug / Memory Popup -->
+  <div id="debugOverlay" class="debug-overlay hidden">
+    <div class="debug-modal">
+      <div class="debug-header">
+        <div class="debug-header-title">
+          <span class="main">Collected Data</span>
+          <span class="sub">What the system thinks it knows about this user</span>
+        </div>
+        <button id="debugCloseBtn" class="debug-close-btn" type="button">Close</button>
+      </div>
+      <div id="debugBody" class="debug-body">
+        <!-- Filled dynamically -->
+        <div class="debug-section">
+          <h3>Loading…</h3>
+          <div class="debug-empty">Fetching current memory and state…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const chatBodyEl = document.getElementById("chatBody");
+    const inputEl = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    const debugBtn = document.getElementById("debugBtn");
+    const debugOverlay = document.getElementById("debugOverlay");
+    const debugCloseBtn = document.getElementById("debugCloseBtn");
+    const debugBody = document.getElementById("debugBody");
+
+    let typingBubbleEl = null;
+
+    function createMessageBubble(msg) {
+      const row = document.createElement("div");
+      row.classList.add("message-row", msg.sender);
+
+      const bubble = document.createElement("div");
+      bubble.classList.add("bubble");
+      bubble.textContent = msg.text;
+
+      const time = document.createElement("div");
+      time.classList.add("time");
+      time.textContent = msg.time || "";
+
+      bubble.appendChild(time);
+      row.appendChild(bubble);
+      return row;
+    }
+
+    function appendMessage(msg) {
+      const bubble = createMessageBubble(msg);
+      messagesEl.appendChild(bubble);
+      scrollToBottom();
+    }
+
+    function scrollToBottom() {
+      chatBodyEl.scrollTop = chatBodyEl.scrollHeight;
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch("/messages");
+        const data = await res.json();
+        messagesEl.innerHTML = "";
+        data.forEach(appendMessage);
+        scrollToBottom();
+      } catch (err) {
+        console.error("Error loading history:", err);
+      }
+    }
+
+    function showTypingIndicator() {
+      if (typingBubbleEl) return;
+
+      const row = document.createElement("div");
+      row.classList.add("message-row", "bot");
+
+      const bubble = document.createElement("div");
+      bubble.classList.add("bubble");
+
+      const wrapper = document.createElement("div");
+      wrapper.classList.add("typing-bubble");
+
+      for (let i = 0; i < 3; i++) {
+        const dot = document.createElement("div");
+        dot.classList.add("typing-dot");
+        wrapper.appendChild(dot);
+      }
+
+      bubble.appendChild(wrapper);
+      row.appendChild(bubble);
+
+      typingBubbleEl = row;
+      messagesEl.appendChild(row);
+      scrollToBottom();
+    }
+
+    function hideTypingIndicator() {
+      if (typingBubbleEl) {
+        typingBubbleEl.remove();
+        typingBubbleEl = null;
+      }
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      setSending(true);
+
+      const now = new Date();
+      const localTime = now.toTimeString().slice(0, 5);
+
+      const tempUserMsg = {
+        sender: "user",
+        text,
+        time: localTime,
+      };
+      appendMessage(tempUserMsg);
+      inputEl.value = "";
+
+      showTypingIndicator();
+
+      try {
+        const res = await fetch("/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text }),
+        });
+
+        hideTypingIndicator();
+
+        if (!res.ok) {
+          console.error("Failed to send");
+          setSending(false);
+          return;
+        }
+
+        const data = await res.json();
+        appendMessage(data.bot);
+      } catch (err) {
+        hideTypingIndicator();
+        console.error("Error sending message:", err);
+      } finally {
+        setSending(false);
+      }
+    }
+
+    function setSending(isSending) {
+      if (isSending) {
+        sendBtn.classList.add("disabled");
+        sendBtn.disabled = true;
+      } else {
+        sendBtn.classList.remove("disabled");
+        sendBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // ----- Debug / Memory popup logic -----
+
+    async function openDebugPanel() {
+      debugOverlay.classList.remove("hidden");
+      debugBody.innerHTML = `
+        <div class="debug-section">
+          <h3>Loading…</h3>
+          <div class="debug-empty">Fetching current memory and state…</div>
+        </div>
+      `;
+
+      try {
+        const res = await fetch("/user_state");
+        if (!res.ok) {
+          throw new Error("Failed to fetch /user_state");
+        }
+        const data = await res.json();
+        renderDebugContent(data);
+      } catch (err) {
+        console.error("Error loading user_state:", err);
+        debugBody.innerHTML = `
+          <div class="debug-section">
+            <h3>Error</h3>
+            <div class="debug-empty">Couldn't load state. Check console / backend.</div>
+          </div>
+        `;
+      }
+    }
+
+    function closeDebugPanel() {
+      debugOverlay.classList.add("hidden");
+    }
+
+    function renderDebugContent(data) {
+      const persona = data.persona || {};
+      const state = data.state || {};
+      const notes = data.memory_notes || [];
+      const concerns = (state.concerns || []);
+
+      debugBody.innerHTML = `
+        <div class="debug-section">
+          <h3>Persona (AI side)</h3>
+          <div class="debug-kv">
+            <span class="key">Name</span>
+            <span class="value">${persona.name || "—"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">Age</span>
+            <span class="value">${persona.age || "—"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">Location</span>
+            <span class="value">${persona.location || "—"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">Bio</span>
+            <span class="value">${persona.bio || "—"}</span>
+          </div>
+        </div>
+
+        <div class="debug-section">
+          <h3>Conversation State</h3>
+          <div class="debug-kv">
+            <span class="key">Relationship</span>
+            <span class="value">${state.relationship_stage || "—"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">User mood</span>
+            <span class="value">${state.user_mood || "—"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">AI mood</span>
+            <span class="value">${state.ai_mood || "—"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">AI energy</span>
+            <span class="value">${state.ai_energy ?? "—"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">Trust level</span>
+            <span class="value">${state.ai_trust_level ?? "—"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">Messages</span>
+            <span class="value">${state.message_count ?? "0"}</span>
+          </div>
+          <div class="debug-kv">
+            <span class="key">Privacy refusal</span>
+            <span class="value">${state.privacy_refusal ? "true" : "false"}</span>
+          </div>
+          <div style="margin-top:4px;">
+            <span class="key" style="color:#9ca3af;font-size:11px;">Open loops</span>
+            <div class="debug-tags" style="margin-top:2px;">
+              ${
+                (state.open_loops && state.open_loops.length)
+                  ? state.open_loops.map(t => `<span class="debug-tag">${t}</span>`).join("")
+                  : `<span class="debug-empty">none</span>`
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="debug-section">
+          <h3>Personality Notes (memory.json)</h3>
+          ${
+            notes.length
+              ? `<ul class="debug-list">
+                  ${notes.map(n => `<li>${n}</li>`).join("")}
+                 </ul>`
+              : `<div class="debug-empty">No personality notes stored yet.</div>`
+          }
+        </div>
+
+        <div class="debug-section">
+          <h3>Concerns to Follow Up</h3>
+          ${
+            (concerns && concerns.length)
+              ? `<ul class="debug-list">
+                   ${concerns.map(c => `
+                      <li>
+                        <div class="concern-type">${c.type || "unknown"}</div>
+                        <div class="concern-text">${c.text || ""}</div>
+                        <div class="debug-kv" style="margin-top:2px;">
+                          <span class="key">created_at</span>
+                          <span class="value">${c.created_at ?? "—"}</span>
+                        </div>
+                        <div class="debug-kv">
+                          <span class="key">last_asked_at</span>
+                          <span class="value">${c.last_asked_at ?? "never"}</span>
+                        </div>
+                        <div class="debug-kv">
+                          <span class="key">resolved</span>
+                          <span class="value">${c.resolved ? "true" : "false"}</span>
+                        </div>
+                      </li>
+                   `).join("")}
+                 </ul>`
+              : `<div class="debug-empty">No tracked concerns yet (health, exam, interview, etc.).</div>`
+          }
+        </div>
+      `;
+    }
+
+    debugBtn.addEventListener("click", openDebugPanel);
+    debugCloseBtn.addEventListener("click", closeDebugPanel);
+    debugOverlay.addEventListener("click", (e) => {
+      if (e.target === debugOverlay) {
+        closeDebugPanel();
+      }
+    });
+
+    // Initial load
+    loadHistory();
+  </script>
+</body>
+</html>

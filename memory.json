@@ -1,0 +1,140 @@
+[
+  {
+    "text": "user likes apples",
+    "type": "legacy",
+    "tags": [],
+    "importance": 1,
+    "source_msg": null,
+    "created_at": null
+  },
+  {
+    "text": "user is planning to get a motorcycle",
+    "type": "legacy",
+    "tags": [],
+    "importance": 1,
+    "source_msg": null,
+    "created_at": null
+  },
+  {
+    "text": "user likes strawberries",
+    "type": "preference",
+    "tags": [
+      "likes strawberries",
+      "food"
+    ],
+    "importance": 1,
+    "source_msg": "i went to the grocery store the other day and i met my high school friend there. We talked about the baseball games we played and enjoyed them and he also bought me some strawberries. He still remembered that I liked them. lol",
+    "created_at": null
+  },
+  {
+    "text": "user has a memory about meeting a high school friend at the grocery store",
+    "type": "story",
+    "tags": [
+      "high school friend",
+      "grocery store"
+    ],
+    "importance": 1,
+    "source_msg": "i went to the grocery store the other day and i met my high school friend there. We talked about the baseball games we played and enjoyed them and he also bought me some strawberries. He still remembered that I liked them. lol",
+    "created_at": null
+  },
+  {
+    "text": "user has a memory about playing and enjoying baseball games with a high school friend",
+    "type": "story",
+    "tags": [
+      "baseball",
+      "high school",
+      "friend"
+    ],
+    "importance": 1,
+    "source_msg": "i went to the grocery store the other day and i met my high school friend there. We talked about the baseball games we played and enjoyed them and he also bought me some strawberries. He still remembered that I liked them. lol",
+    "created_at": null
+  },
+  {
+    "text": "user likes physics",
+    "type": "preference",
+    "tags": [
+      "likes",
+      "physics"
+    ],
+    "importance": 1,
+    "source_msg": "i like physics",
+    "created_at": null
+  },
+  {
+    "text": "user felt romantic attraction to a girl in their class today",
+    "type": "relationship",
+    "tags": [
+      "girl in class",
+      "romantic attraction"
+    ],
+    "importance": 1,
+    "source_msg": "there is a girl in my class and she talked to me today and I started blushing and I felt something for her. lol",
+    "created_at": null
+  },
+  {
+    "text": "user was recently in a car crash",
+    "type": "story",
+    "tags": [
+      "car crash",
+      "recent"
+    ],
+    "importance": 3,
+    "source_msg": "i got in a car crash and im not feeling well",
+    "created_at": null
+  },
+  {
+    "text": "user is currently not feeling well and may be in distress",
+    "type": "concern",
+    "tags": [
+      "not feeling well",
+      "distress"
+    ],
+    "importance": 3,
+    "source_msg": "i got in a car crash and im not feeling well",
+    "created_at": null
+  },
+  {
+    "text": "user is thinking about writing a book",
+    "type": "goal",
+    "tags": [
+      "writing",
+      "book"
+    ],
+    "importance": 1,
+    "source_msg": "i was thinking to write a book",
+    "created_at": null
+  },
+  {
+    "text": "user feels romantic attraction toward a girl referred to as \"her\"",
+    "type": "relationship",
+    "tags": [
+      "romantic attraction",
+      "her"
+    ],
+    "importance": 2,
+    "source_msg": "i think i like her",
+    "created_at": null
+  },
+  {
+    "text": "user likes observing cats",
+    "type": "preference",
+    "tags": [
+      "likes cats",
+      "observing"
+    ],
+    "importance": 1,
+    "source_msg": "i was walking on that and i saw a cute cat walking towards me she has like furry hair and she was hungry",
+    "created_at": null
+  },
+  {
+    "text": "user encountered a cute, hungry cat while walking",
+    "type": "story",
+    "tags": [
+      "cat",
+      "walking"
+    ],
+    "importance": 1,
+    "source_msg": "i was walking on that and i saw a cute cat walking towards me she has like furry hair and she was hungry",
+    "created_at": null
+  }
+]

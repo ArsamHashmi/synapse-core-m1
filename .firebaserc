@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "synapse-core-m1",
+    "synapse": "synapse-core-m1"
+  },
+  "targets": {},
+  "etags": {}
+}

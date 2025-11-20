@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat with Computer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <!-- Background orbs -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="chat-wrapper">
+    <!-- Header -->
+    <div class="chat-header">
+      <div class="avatar">AI</div>
+      <div class="header-text">
+        <div class="header-top-row">
+          <div class="header-left">
+            <div class="header-name-row">
+              <div class="name">Neon Computer</div>
+              <div class="status-pill">
+                <span class="status-dot"></span>
+                <span>Live Link</span>
+              </div>
+            </div>
+            <div class="header-subtitle">Talking to a simulated intelligence</div>
+          </div>
+          <div class="header-actions">
+            <button id="debugBtn" class="debug-btn" type="button">
+              <span class="icon">☰</span>
+              <span>Memory</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="chat-body" id="chatBody">
+      <div class="messages" id="messages"></div>
+    </div>
+
+    <!-- Input -->
+    <div class="chat-input-area">
+      <div class="input-box">
+        <span class="input-icon">⌘</span>
+        <input
+          id="messageInput"
+          type="text"
+          placeholder="Type a message to the computer..."
+          autocomplete="off"
+        />
+      </div>
+      <button id="sendBtn" class="send-btn" type="button">
+        <span class="send-icon">➤</span>
+        <span>Send</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Debug / Memory Popup -->
+  <div id="debugOverlay" class="debug-overlay hidden">
+    <div class="debug-modal">
+      <div class="debug-header">
+        <div class="debug-header-title">
+          <span class="main">Collected Data</span>
+          <span class="sub">What the system thinks it knows about this user</span>
+        </div>
+        <button id="debugCloseBtn" class="debug-close-btn" type="button">Close</button>
+      </div>
+      <div id="debugBody" class="debug-body">
+        <div class="debug-section">
+          <h3>Loading…</h3>
+          <div class="debug-empty">Fetching current memory and state…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main chat logic -->
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+</body>
+</html>
